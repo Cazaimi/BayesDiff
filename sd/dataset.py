@@ -54,6 +54,7 @@ class laion_dataset(torch.utils.data.Dataset):
 
     def __getitem__(self,idx):
         
+        print(len(self.entries))
         subpath = self.entries[idx]
         x_path = os.path.join(self.image_path, subpath)
         txt = self.df.iloc[int(subpath[:-4]), 1] # obtain the corresponding prompt for this image
