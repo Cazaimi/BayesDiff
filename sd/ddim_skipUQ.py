@@ -153,13 +153,14 @@ def main():
     parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--total_n_samples', type=int, default=80)
     opt = parser.parse_args()
-    print(opt)
+    print('options:', opt)
     seed_everything(opt.seed)
 
     config = OmegaConf.load(f"{opt.config}")
     model = load_model_from_config(config, f"{opt.ckpt}")
     # print(model.model.diffusion_model.out[2])
     # Conv2d(320, 4, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
+    # print('opt.train_la_batch_size:', opt.train_la_batch_size)
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
@@ -190,7 +191,8 @@ def main():
         uc = model.get_learned_conditioning(opt.sample_batch_size * [""])
         exp_dir = f'./ddim_exp/skipUQ/cfg{opt.scale}_{opt.prompt}_train{opt.train_la_data_size}_step{opt.timesteps}_S{opt.mc_size}/'
         os.makedirs(exp_dir, exist_ok=True)
-        data = ["Old Major, an aged boar, addressing a gathering of diverse farm animals under dim light in a barn, stirring revolutionary zeal, digital art."]
+        print('exp_dir:', exp_dir)
+        data = [opt.prompt]
     try:
   #########   start sample  ########## 
       total_n_samples = opt.total_n_samples
@@ -301,13 +303,15 @@ def main():
                           
                           ####### Save variance and sample image  ######         
                           var_sum[:, loop] = var_xt_next.sum(dim=(1,2,3))
+                        #   var_sum_img_array = torch.clamp((var_xt_next + 1.0) / 2.0, min=0.0, max=1.0)
+                        #   tvu.save_image(var_sum_img_array.cpu().float(), os.path.join(exp_dir, "variance.png"))
                           x_samples = model.decode_first_stage(xt_next)
                           x = torch.clamp((x_samples + 1.0) / 2.0, min=0.0, max=1.0)
-                          # os.makedirs(os.path.join(exp_dir, 'sam/'), exist_ok=True)
-                          # for i in range(x.shape[0]):
-                          #     path = os.path.join(exp_dir, 'sam/', f"{img_id}.png")
-                          #     tvu.save_image(x.cpu()[i].float(), path)
-                          #     img_id += 1
+                          os.makedirs(os.path.join(exp_dir, 'sam/'), exist_ok=True)
+                          for i in range(x.shape[0]):
+                              path = os.path.join(exp_dir, 'sam/', f"{img_id}.png")
+                              tvu.save_image(x.cpu()[i].float(), path)
+                              img_id += 1
                           sample_x.append(x)
 
                       sample_x = torch.concat(sample_x, dim=0)
@@ -320,9 +324,12 @@ def main():
                       grid_sample_x = tvu.make_grid(reordered_sample_x, nrow=8, padding=2)
                       tvu.save_image(grid_sample_x.cpu().float(), os.path.join(exp_dir, "sorted_sample.png"))
 
+                      print('grid_sample_x.cpu().float():', grid_sample_x.cpu().float())
+                      print('var_sum.cpu():', var_sum.cpu())
                       print(f'Sampling {total_n_samples} images in {exp_dir}')
                       torch.save(var_sum.cpu(), os.path.join(exp_dir, 'var_sum.pt'))
-    except:
-      print("Exception")
+                      torch.save(var_xt_next.cpu(), os.path.join(exp_dir, 'variance.pt'))
+    except Exception as err:
+      print("Exception:", err)
 if __name__ == "__main__":
     main()
